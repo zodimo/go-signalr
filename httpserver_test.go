@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
+	"github.com/gorilla/websocket"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/gorilla/websocket"
 )
 
 type addHub struct {
@@ -249,7 +249,7 @@ func handShakeAndCallWebSocketTestServer(port int, connectionID string) {
 	dialer := &websocket.Dialer{
 		HandshakeTimeout: time.Second * 10,
 	}
-	
+
 	ws, _, err := dialer.Dial(fmt.Sprintf("ws://127.0.0.1:%v/hub%v", port, urlParam), nil)
 	Expect(err).To(BeNil())
 	defer func() {

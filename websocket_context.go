@@ -25,8 +25,8 @@ func (c *contextualWebSocketConn) WriteWithContext(ctx context.Context, messageT
 
 	select {
 	case <-ctx.Done():
-		c.WriteControl(websocket.CloseMessage, 
-			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "context cancelled"), 
+		c.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "context cancelled"),
 			time.Now().Add(time.Second))
 		c.Close()
 		return ctx.Err()
@@ -50,8 +50,8 @@ func (c *contextualWebSocketConn) ReadWithContext(ctx context.Context) (int, []b
 
 	select {
 	case <-ctx.Done():
-		c.WriteControl(websocket.CloseMessage, 
-			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "context cancelled"), 
+		c.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "context cancelled"),
 			time.Now().Add(time.Second))
 		c.Close()
 		return 0, nil, ctx.Err()
