@@ -4,10 +4,10 @@ go 1.24
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/coder/websocket v1.8.13
 	github.com/dave/jennifer v1.7.1
 	github.com/go-kit/log v0.2.1
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.38.0
 	github.com/quic-go/webtransport-go v0.9.0

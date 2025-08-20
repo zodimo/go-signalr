@@ -18,7 +18,7 @@ import (
 	"github.com/go-kit/log/level"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/coder/websocket"
+	"github.com/gorilla/websocket"
 )
 
 type addHub struct {
@@ -245,10 +245,15 @@ func handShakeAndCallWebSocketTestServer(port int, connectionID string) {
 	if connectionID != "" {
 		urlParam = fmt.Sprintf("?id=%v", connectionID)
 	}
-	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://127.0.0.1:%v/hub%v", port, urlParam), nil)
+	// CHANGED: Use gorilla dialer
+	dialer := &websocket.Dialer{
+		HandshakeTimeout: time.Second * 10,
+	}
+	
+	ws, _, err := dialer.Dial(fmt.Sprintf("ws://127.0.0.1:%v/hub%v", port, urlParam), nil)
 	Expect(err).To(BeNil())
 	defer func() {
-		_ = ws.Close(websocket.StatusNormalClosure, "")
+		_ = ws.Close()
 	}()
 	wsConn := newWebSocketConnection(context.TODO(), connectionID, ws)
 	cliConn := newHubConnection(wsConn, &protocol, 1<<15, testLogger())

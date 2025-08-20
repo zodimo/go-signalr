@@ -6,11 +6,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"github.com/coder/websocket"
+	"time"
+	"github.com/gorilla/websocket"
 )
 
 func NewWebSocketConnection(ctx context.Context, reqURL *url.URL, connectionID string, headers http.Header) (Connection, error) {
-	ws, _, err := websocket.Dial(ctx, reqURL.String(), &websocket.DialOptions{HTTPHeader: headers})
+	// CHANGED: Use gorilla dialer instead of direct Dial
+	dialer := &websocket.Dialer{
+		HandshakeTimeout: time.Second * 30,
+	}
+	
+	ws, _, err := dialer.Dial(reqURL.String(), headers)  // CHANGED: API
 	if err != nil {
 		return nil, err
 	}
@@ -20,26 +26,29 @@ func NewWebSocketConnection(ctx context.Context, reqURL *url.URL, connectionID s
 
 type webSocketConnection struct {
 	ConnectionBase
-	conn         *websocket.Conn
+	conn         *contextualWebSocketConn  // CHANGED: Use wrapped conn
 	transferMode TransferMode
 }
 
 func newWebSocketConnection(ctx context.Context, connectionID string, conn *websocket.Conn) *webSocketConnection {
 	w := &webSocketConnection{
-		conn:           conn,
+		conn:           wrapGorillaConn(conn),  // CHANGED: Wrap conn
 		ConnectionBase: *NewConnectionBase(ctx, connectionID),
 	}
 	return w
 }
 
 func (w *webSocketConnection) Write(p []byte) (n int, err error) {
-	messageType := websocket.MessageText
+	// CHANGED: Update message type constants
+	messageType := websocket.TextMessage
 	if w.transferMode == BinaryTransferMode {
-		messageType = websocket.MessageBinary
+		messageType = websocket.BinaryMessage
 	}
+	
 	n, err = ReadWriteWithContext(w.Context(),
 		func() (int, error) {
-			err := w.conn.Write(w.Context(), messageType, p)
+			// CHANGED: Use wrapped WriteWithContext
+			err := w.conn.WriteWithContext(w.Context(), messageType, p)
 			if err != nil {
 				return 0, err
 			}
@@ -48,7 +57,8 @@ func (w *webSocketConnection) Write(p []byte) (n int, err error) {
 		func() {})
 	if err != nil {
 		err = fmt.Errorf("%T: %w", w, err)
-		_ = w.conn.Close(1000, err.Error())
+		// CHANGED: Use wrapped CloseWithReason
+		_ = w.conn.CloseWithReason(websocket.CloseNormalClosure, err.Error())
 	}
 	return n, err
 }
@@ -56,7 +66,8 @@ func (w *webSocketConnection) Write(p []byte) (n int, err error) {
 func (w *webSocketConnection) Read(p []byte) (n int, err error) {
 	n, err = ReadWriteWithContext(w.Context(),
 		func() (int, error) {
-			_, data, err := w.conn.Read(w.Context())
+			// CHANGED: Use wrapped ReadWithContext
+			_, data, err := w.conn.ReadWithContext(w.Context())
 			if err != nil {
 				return 0, err
 			}
@@ -65,11 +76,13 @@ func (w *webSocketConnection) Read(p []byte) (n int, err error) {
 		func() {})
 	if err != nil {
 		err = fmt.Errorf("%T: %w", w, err)
-		_ = w.conn.Close(1000, err.Error())
+		// CHANGED: Use wrapped CloseWithReason  
+		_ = w.conn.CloseWithReason(websocket.CloseNormalClosure, err.Error())
 	}
 	return n, err
 }
 
+// TransferMode and SetTransferMode remain unchanged
 func (w *webSocketConnection) TransferMode() TransferMode {
 	return w.transferMode
 }

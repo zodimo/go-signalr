@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"time"
 
 	"github.com/quic-go/webtransport-go"
-	"github.com/coder/websocket"
+	"github.com/gorilla/websocket"
 )
 
 // Doer is the *http.Client interface
@@ -160,19 +161,22 @@ func NewHTTPConnection(ctx context.Context, address string, options ...func(*htt
 			wsURL.Scheme = "ws"
 		}
 
-		opts := &websocket.DialOptions{}
+		// CHANGED: Use gorilla dialer instead of DialOptions
+		dialer := &websocket.Dialer{
+			HandshakeTimeout: time.Second * 30,
+		}
 
+		headers := http.Header{}
 		if httpConn.headers != nil {
-			opts.HTTPHeader = httpConn.headers()
-		} else {
-			opts.HTTPHeader = http.Header{}
+			headers = httpConn.headers()
 		}
 
 		for _, cookie := range resp.Cookies() {
-			opts.HTTPHeader.Add("Cookie", cookie.String())
+			headers.Add("Cookie", cookie.String())
 		}
 
-		ws, _, err := websocket.Dial(ctx, wsURL.String(), opts)
+		// CHANGED: Use dialer.DialContext instead of websocket.Dial
+		ws, _, err := dialer.DialContext(ctx, wsURL.String(), headers)
 		if err != nil {
 			return nil, err
 		}

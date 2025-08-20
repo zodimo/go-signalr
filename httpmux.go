@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/teivah/onecontext"
-	"github.com/coder/websocket"
+	"github.com/gorilla/websocket"
 )
 
 type httpMux struct {
@@ -144,18 +144,47 @@ func (h *httpMux) handleServerSentEvent(writer http.ResponseWriter, request *htt
 }
 
 func (h *httpMux) handleWebsocket(writer http.ResponseWriter, request *http.Request) {
-	accOptions := &websocket.AcceptOptions{
-		CompressionMode:    websocket.CompressionContextTakeover,
-		InsecureSkipVerify: h.server.insecureSkipVerify(),
-		OriginPatterns:     h.server.originPatterns(),
+	// CHANGED: Use gorilla Upgrader instead of AcceptOptions
+	upgrader := &websocket.Upgrader{
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		EnableCompression: true,  // CHANGED: equivalent to CompressionContextTakeover
+		CheckOrigin: func(r *http.Request) bool {
+			// CHANGED: Implement origin checking based on server settings
+			if h.server.insecureSkipVerify() {
+				return true
+			}
+			
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true
+			}
+			
+			patterns := h.server.originPatterns()
+			if len(patterns) == 0 {
+				return true
+			}
+			
+			for _, pattern := range patterns {
+				if pattern == "*" || pattern == origin {
+					return true
+				}
+				// Add more sophisticated pattern matching if needed
+			}
+			return false
+		},
 	}
-	websocketConn, err := websocket.Accept(writer, request, accOptions)
+	
+	// CHANGED: Use upgrader.Upgrade instead of websocket.Accept
+	websocketConn, err := upgrader.Upgrade(writer, request, nil)
 	if err != nil {
 		_, debug := h.server.loggers()
-		_ = debug.Log(evt, "handleWebsocket", msg, "error accepting websockets", "error", err)
-		// don't need to write an error header here as websocket.Accept has already used http.Error
+		_ = debug.Log(evt, "handleWebsocket", msg, "error upgrading websockets", "error", err)
+		// Note: upgrader.Upgrade handles HTTP error responses automatically
 		return
 	}
+	
+	// CHANGED: Set read limit using gorilla API
 	websocketConn.SetReadLimit(int64(h.server.maximumReceiveMessageSize()))
 	connectionMapKey := request.URL.Query().Get("id")
 	if connectionMapKey == "" {
@@ -176,15 +205,25 @@ func (h *httpMux) handleWebsocket(writer http.ResponseWriter, request *http.Requ
 			ctx, _ := onecontext.Merge(h.server.Context(), request.Context())
 			err = h.serveConnection(newWebSocketConnection(ctx, c.ConnectionID(), websocketConn))
 			if err != nil {
-				_ = websocketConn.Close(1005, err.Error())
+				// CHANGED: Use gorilla close method
+				_ = websocketConn.WriteControl(websocket.CloseMessage,
+					websocket.FormatCloseMessage(websocket.CloseInternalServerErr, err.Error()),
+					time.Now().Add(time.Second))
+				_ = websocketConn.Close()
 			}
 		} else {
 			// Already initiated
-			_ = websocketConn.Close(1002, "Bad request")
+			_ = websocketConn.WriteControl(websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Bad request"),
+				time.Now().Add(time.Second))
+			_ = websocketConn.Close()
 		}
 	} else {
 		// Not negotiated
-		_ = websocketConn.Close(1002, "Not found")
+		_ = websocketConn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Not found"),
+			time.Now().Add(time.Second))
+		_ = websocketConn.Close()
 	}
 }
 

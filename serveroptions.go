@@ -59,8 +59,8 @@ func HTTPTransports(transports ...TransportType) func(Party) error {
 	}
 }
 
-// InsecureSkipVerify disables Accepts origin verification behaviour which is used to avoid same origin strategy.
-// See https://pkg.go.dev/github.com/coder/websocket#AcceptOptions
+// InsecureSkipVerify disables origin verification behaviour which is used to avoid same origin strategy.
+// See https://pkg.go.dev/github.com/gorilla/websocket#Upgrader
 func InsecureSkipVerify(skip bool) func(Party) error {
 	return func(p Party) error {
 		p.setInsecureSkipVerify(skip)
@@ -69,7 +69,7 @@ func InsecureSkipVerify(skip bool) func(Party) error {
 }
 
 // AllowOriginPatterns lists the host patterns for authorized origins which is used for avoid same origin strategy.
-// See https://pkg.go.dev/github.com/coder/websocket#AcceptOptions
+// See https://pkg.go.dev/github.com/gorilla/websocket#Upgrader
 func AllowOriginPatterns(origins []string) func(Party) error {
 	return func(p Party) error {
 		p.setOriginPatterns(origins)
