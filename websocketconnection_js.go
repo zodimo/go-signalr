@@ -1,6 +1,3 @@
-//go:build !js
-// +build !js
-
 package signalr
 
 import (
@@ -14,7 +11,7 @@ import (
 )
 
 func NewWebSocketConnection(ctx context.Context, reqURL *url.URL, connectionID string, headers http.Header) (Connection, error) {
-	ws, _, err := websocket.Dial(ctx, reqURL.String(), &websocket.DialOptions{HTTPHeader: headers})
+	ws, _, err := websocket.Dial(ctx, reqURL.String(), &websocket.DialOptions{}) // removed headers
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,3 @@
-//go:build !js
-// +build !js
-
 package signalr
 
 import (
@@ -165,15 +162,15 @@ func NewHTTPConnection(ctx context.Context, address string, options ...func(*htt
 
 		opts := &websocket.DialOptions{}
 
-		if httpConn.headers != nil {
-			opts.HTTPHeader = httpConn.headers()
-		} else {
-			opts.HTTPHeader = http.Header{}
-		}
+		// if httpConn.headers != nil {
+		// 	opts.HTTPHeader = httpConn.headers()
+		// } else {
+		// 	opts.HTTPHeader = http.Header{}
+		// }
 
-		for _, cookie := range resp.Cookies() {
-			opts.HTTPHeader.Add("Cookie", cookie.String())
-		}
+		// for _, cookie := range resp.Cookies() {
+		// 	opts.HTTPHeader.Add("Cookie", cookie.String())
+		// }
 
 		ws, _, err := websocket.Dial(ctx, wsURL.String(), opts)
 		if err != nil {
