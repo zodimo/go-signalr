@@ -320,22 +320,42 @@ func (c *client) State() ClientState {
 
 func (c *client) setState(state ClientState) {
 	c.mx.Lock()
-	defer c.mx.Unlock()
-
 	c.state = state
 	_ = c.dbg.Log("state", state)
 
-	for _, ch := range c.stateChangeChans {
-		go func(ch chan ClientState, state ClientState) {
-			c.mx.Lock()
-			defer c.mx.Unlock()
+	// Make a copy of the channels while holding the lock
+	channels := make([]chan ClientState, len(c.stateChangeChans))
+	copy(channels, c.stateChangeChans)
+	c.mx.Unlock()
 
+	// Notify observers without holding the lock to avoid deadlock
+	// Use a timeout to ensure we never block the client, even if application code is slow
+	for _, ch := range channels {
+		go func(ch chan ClientState, state ClientState) {
+			// Verify the channel is still valid by checking if it's still in the list
+			c.mx.RLock()
+			found := false
 			for _, cch := range c.stateChangeChans {
 				if cch == ch {
-					select {
-					case ch <- state:
-					case <-c.ctx.Done():
-					}
+					found = true
+					break
+				}
+			}
+			c.mx.RUnlock()
+
+			if found {
+				// Use a timeout to prevent blocking the client indefinitely
+				timeout := time.NewTimer(100 * time.Millisecond) // 100ms timeout for state notifications
+				defer timeout.Stop()
+
+				select {
+				case ch <- state:
+					// Successfully sent
+				case <-timeout.C:
+					// Timeout - application code is too slow, skip this notification
+					_ = c.dbg.Log("state", state, "ch timeout - application code too slow")
+				case <-c.ctx.Done():
+					// Client context canceled
 				}
 			}
 		}(ch, state)
